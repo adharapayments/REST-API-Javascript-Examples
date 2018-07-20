@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Equity</title>
+	<link rel="stylesheet" href="style.css">
+	<meta charset="utf-8">
+</head>
+<body>
+
+<div id="strategyEquityChart" style="height: 300px; width:100%;"></div>
+
+<script type="text/javascript" src="jquery.min.js"></script>
+<script type="text/javascript" src="jquery-ajaxreadystate.js"></script>
+<script type="text/javascript" src="2.0.0-crypto-sha1.js"></script>
+<script type="text/javascript" src="q.js"></script>
+<script type="text/javascript" src="wrapper.js"></script>
+<script src="https://code.highcharts.com/stock/highstock.js"></script>
+<script src="https://code.highcharts.com/stock/modules/exporting.js"></script>
+<script type="text/javascript">
+
+var pips=5;
+var sec="EUR/USD";
+
+var dpsSE = [];
+var strategyEquityChart = new Highcharts.StockChart("strategyEquityChart",{
+	title: {
+		text: "Strategy Equity"
+	},
+	chart: {
+		type: 'line'
+	},
+	axisY:{
+		includeZero: false,
+		gridLineDashStyle: 'longdash'
+	},
+	yAxis: [
+		{
+			title: {
+				text: 'Equity'
+			},
+			top:1,
+			lineWidth: 1,
+			gridLineDashStyle: 'longdash'
+		}],
+	legend: {
+		enabled: false
+	},
+	rangeSelector : {
+		enabled: false
+	},
+	navigator : {
+		//height: 20
+	},
+	series: [
+		{
+			id: 'strategyEquitySerie',
+			name: 'equity',
+			type: 'line',
+			color: 'blue',
+			data: dpsSE
+		}
+	]
+});
+
+var wrapper = Object.create(Wrapper);
+//wrapper.url = "./";
+wrapper.url = "http://actfx.adhara.io:81";
+wrapper.user = "adhara";
+wrapper.password = "adhara";
+
+function getPositionStreaming(){
+	wrapper.getPositionStreaming( null, null, null, 1000, function processPosition(entry) {
+			if (entry.hasOwnProperty('getPositionResponse')) {
+				if (entry.getPositionResponse.hasOwnProperty('accounting')) {
+					var accounting = entry.getPositionResponse.accounting
+					var ts = parseFloat(entry.getPositionResponse.timestamp)*1000;
+					dpsSE.push([
+						ts,
+						accounting.strategyPL
+					]);
+					strategyEquityChart.get('strategyEquitySerie').setData(dpsSE);
+				}
+			}
+		}
+	);
+}
+
+
+wrapper.getAuthentication()
+.then(function(resp){
+	getPositionStreaming();
+});
+
+
+
+</script>
+
+</body>
+</html>

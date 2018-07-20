@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>FBA</title>
+	<meta charset="utf-8">
+	<link rel="stylesheet" href="http://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.css">
+	<script src="http://code.jquery.com/jquery-1.11.3.min.js"></script>
+	<script src="http://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.js"></script>
+</head>
+<body>
+
+<table width="100%">
+	<tr>
+		<th>
+			<button id="freezeButton" style="border-style:outset;" onclick="freeze(this)">FREEZE</button>
+		</th>
+		<th width="20%">
+			<label style="text-align: right">Select price amplitude:</label>
+		</th>
+		<th width="50%">
+			<input type="range" name="amplitude" id="amplitude" value="5" min="0" max="100" onchange="changeAmplitude(this.value)">
+		</th>
+		<th width="20%">
+			<label id="amplitudeLabel" style="text-align: left">0.5 pips shown from top of book</label>
+		</th>
+	</tr>
+</table>
+
+
+			<table width="100%" class="scroll">
+				<thead id="fbhead">
+				</thead>
+				<tbody id="fbbody" style="height:700px;">
+				</tbody>
+			</table>
+
+
+	<table align="center" border=1>
+		<tr id="leyend">
+			<td>Leyend:</td>
+			<td>EMPTY BID</td>
+			<td>QUOTE BID</td>
+			<td>TI TOB BID</td>
+			<td>OVERALL TOB BID</td>
+			<td>EMPTY ASK</td>
+			<td>QUOTE ASK</td>
+			<td>TI TOB ASK</td>
+			<td>OVERALL TOB ASK</td>
+			<td>OWN BUY</td>
+			<td>OWN SELL</td>
+		</tr>
+	</table>
+
+
+<script type="text/javascript" src="jquery.min.js"></script>
+<script type="text/javascript" src="jquery-ajaxreadystate.js"></script>
+<script type="text/javascript" src="2.0.0-crypto-sha1.js"></script>
+<script type="text/javascript" src="q.js"></script>
+<script type="text/javascript" src="wrapper.js"></script>
+<script src="https://code.highcharts.com/stock/highstock.js"></script>
+<script src="https://code.highcharts.com/stock/modules/exporting.js"></script>
+<script type="text/javascript">
+
+var wrapper = Object.create(Wrapper);
+wrapper.url = "http://actfx.adhara.io:81";
+wrapper.user = "adhara";
+wrapper.password = "adhara";
+
+curpos = 5;
+var frozen = false;
+
+var sec="EUR/USD";
+var pips=5;
+var d=(1/(Math.pow(10, pips)));
+var w=10;
+
+var tis=[];
+var cAsk='rgba(0,255,0,0.2)';
+var cTiAsk='rgba(0,255,0,0.5)';
+var cBeAsk='rgba(0,255,0,1.0)';
+var cBid='rgba(0,0,255,0.2)';
+var cTiBid='rgba(0,0,255,0.5)';
+var cBeBid='rgba(0,0,255,1.0)';
+
+
+function getInterface(){
+	wrapper.getInterface(updateInterfaces);
+}
+
+function updateInterfaces(entry){
+	tis=[];
+	var ask;
+	var bid;
+	if (entry.hasOwnProperty('getInterfaceResponse')) {
+		if (entry.getInterfaceResponse.hasOwnProperty('tinterface')) {
+			entry.getInterfaceResponse.tinterface.forEach(function(tinterface) {
+				tis.push(tinterface.name);
+			});
+		}
+	}
+	w = 100/((tis.length*2)+3);
+	init();
+}
+
+function getPriceStreaming(){
+	wrapper.getPriceStreaming( [sec], null, "fab", 5, 1000, processPrices);
+}
+
+function processPrices(entry){
+	if(frozen){
+		return;
+	}
+	bestAsk=0;
+	bestBid=0;
+	var askMap = {};
+	var bidMap = {};
+	var askTIMap = {};
+	var bidTIMap = {};
+	var top=0;
+	var low=0;
+	var num = fbbody.rows.length;
+	for (var i=0; i<num; i++){
+		fbbody.deleteRow(0);
+	}
+	if (entry.hasOwnProperty('getPriceResponse')) {
+		if (entry.getPriceResponse.hasOwnProperty('tick')) {
+			entry.getPriceResponse.tick.forEach(function(tick) {
+				var p=tick.price;
+				if (top==0 || p>top){
+					top = p;
+				}
+				if (low==0 || p<low){
+					low = p;
+				}
+				if (tick.side=="ask") {
+					if (!askTIMap.hasOwnProperty(tick.tinterface)){
+						askTIMap[tick.tinterface]=tick.price;
+					}
+					else{
+						if(tick.price<askTIMap[tick.tinterface]){
+							askTIMap[tick.tinterface]=tick.price;
+						}
+					}
+					if (!askMap.hasOwnProperty(p)){
+						var t = {'ti':tick.tinterface, 'liq':tick.liquidity};
+						askMap[p]={};
+						askMap[p][tick.tinterface] = [t];
+						if (bestAsk==0 || p<bestAsk){
+							bestAsk = p;
+						}
+					}
+					else{
+						var tickMap = askMap[p];
+						if (!tickMap.hasOwnProperty(tick.tinterface)){
+							var t = {'ti':tick.tinterface, 'liq':tick.liquidity};
+							askMap[p][tick.tinterface] = [t];
+						}
+						else{
+							var t = {'ti':tick.tinterface, 'liq':tick.liquidity};
+							askMap[p][tick.tinterface].push(t);
+						}
+					}
+				}
+				if (tick.side=="bid") {
+					if (!bidTIMap.hasOwnProperty(tick.tinterface)){
+						bidTIMap[tick.tinterface]=tick.price;
+					}
+					else{
+						if(tick.price>bidTIMap[tick.tinterface]){
+							bidTIMap[tick.tinterface]=tick.price;
+						}
+					}
+					if (!bidMap.hasOwnProperty(p)){
+						var t = {'ti':tick.tinterface, 'liq':tick.liquidity};
+						bidMap[p]={};
+						bidMap[p][tick.tinterface] = [t];
+						if (bestBid==0 || p>bestBid){
+							bestBid = p;
+						}
+					}
+					else{
+						var tickMap = bidMap[p];
+						if (!tickMap.hasOwnProperty(tick.tinterface)){
+							var t = {'ti':tick.tinterface, 'liq':tick.liquidity};
+							bidMap[p][tick.tinterface] = [t];
+						}
+						else{
+							var t = {'ti':tick.tinterface, 'liq':tick.liquidity};
+							bidMap[p][tick.tinterface].push(t);
+						}
+					}
+				}
+			});
+		}
+	}
+
+	var asklimit=top;
+	var bidlimit=low;
+	if (curpos!=100){
+		asklimit=Number(Math.round((bestAsk+(curpos*d))+'e' + pips)+'e-' + pips);
+		bidlimit=Number(Math.round((bestBid-(curpos*d))+'e' + pips)+'e-' + pips);
+		if(bestBid>asklimit){
+			top=bestBid;
+		}
+		else{
+			top=asklimit;
+		}
+		if(bestAsk<bidlimit){
+			low=bestAsk;
+		}
+		else{
+			low=bidlimit;
+		}
+	}
+
+console.log(top + "\t" + low + "\t" + bestAsk + "\t" + bestBid + "\t" + asklimit + "\t" + bidlimit);
+
+var found = true;
+	for (var p=top; p>=low; p=Number(Math.round((p-d)+'e' + pips)+'e-' + pips)){
+//console.log(bestAsk + " - " + p + " - " + d);
+//p=Number(Math.round(p+'e' + pips)+'e-' + pips);
+//console.log(bestAsk + " - " + p);
+var ex=0;
+
+		if((!askMap.hasOwnProperty(p) || p>asklimit) && (!bidMap.hasOwnProperty(p) || p<bidlimit)){
+			if (found==true){
+				var row = fbbody.insertRow(-1);
+				for (var i=0; i<(tis.length*2)+3; i++){
+					var cell = row.insertCell(i);
+					if (i==tis.length+1){
+						cell.innerHTML= "...";
+					}
+					cell.style.width=w+"%";
+					cell.style="text-align:center";
+				}
+				found=false;
+			}
+		}
+		else{
+			found=true;
+			var row = fbbody.insertRow(-1);
+			for (var i=0; i<(tis.length*2)+3; i++){
+				var cell = row.insertCell(i);
+				if (i==tis.length+1){
+					cell.innerHTML= p.toFixed(pips);
+				}
+				cell.style.width=w+"%";
+				cell.style="text-align:center";
+			}
+			if (askMap.hasOwnProperty(p) && p<=asklimit){
+				var tickMap = askMap[p];
+				for (var i=0; i<tis.length; i++){
+					var ti=tis[i];
+					if (tickMap.hasOwnProperty(ti)){
+						row.cells[(tis.length*2)+2-i].innerHTML= fliq(tickMap[ti][0].liq);
+						row.cells[(tis.length*2)+2-i].style="text-align:center;background-color:"+cAsk;
+						if(p==askTIMap[ti]){
+							row.cells[(tis.length*2)+2-i].style="text-align:center;background-color:"+cTiAsk;
+						}
+						if(p==bestAsk){
+ex=1;
+							row.cells[(tis.length*2)+2-i].style="text-align:center;background-color:"+cBeAsk;
+						}
+					}
+				}
+			}
+			if (bidMap.hasOwnProperty(p) && p>=bidlimit){
+				var tickMap = bidMap[p];
+				for (var i=0; i<tis.length; i++){
+					var ti=tis[i];
+					if (tickMap.hasOwnProperty(ti)){
+						row.cells[i].innerHTML= fliq(tickMap[ti][0].liq);
+						row.cells[i].style="text-align:center;background-color:"+cBid;
+						if(p==bidTIMap[ti]){
+							row.cells[i].style="text-align:center;background-color:"+cTiBid;
+						}
+						if(p==bestBid){
+							row.cells[i].style="text-align:center;background-color:"+cBeBid;
+						}
+					}
+				}
+			}
+		}
+	}
+//if(ex==0){alert("YA")};
+	
+}
+
+function fliq(liq){
+	if (liq<1000){
+		return liq;
+	}
+	if (liq>=1000 && liq<1000000){
+		return (liq/1000).toFixed(1) + "K";
+	}
+	if (liq>=1000000){
+		return (liq/1000000).toFixed(1) + "M";
+	}
+
+}
+
+
+
+function init(){
+
+	leyend.cells[2].style="text-align:center;background-color:" + cBid;
+	leyend.cells[3].style="text-align:center;background-color:" + cTiBid;
+	leyend.cells[4].style="text-align:center;background-color:" + cBeBid;
+	leyend.cells[6].style="text-align:center;background-color:" + cAsk;
+	leyend.cells[7].style="text-align:center;background-color:" + cTiAsk;
+	leyend.cells[8].style="text-align:center;background-color:" + cBeAsk;
+
+	if (fbhead.rows.length>0){
+		fbhead.deleteRow(0);
+	}
+	var row = fbhead.insertRow(-1);
+	for (var i=0; i<(tis.length*2)+3; i++){
+		var cell = row.insertCell(i);
+		cell.style.width=w+"%";
+	}
+	for (var i=0; i<tis.length; i++){
+		row.cells[i].outerHTML= "<th>" + tis[i] + "</th>";
+		row.cells[(tis.length*2)+2-i].outerHTML= "<th>" + tis[i] + "</th>";
+	}
+	row.cells[tis.length].outerHTML= "<th>Own BUYs</th>";
+	row.cells[tis.length+1].outerHTML= "<th>Prices</th>";
+	row.cells[tis.length+2].outerHTML= "<th>Own SELLs</th>";
+}
+
+
+function freeze(btn){
+	if (frozen){
+		btn.style = 'border-style:outset';
+		btn.innerHTML = 'FREEZE';
+		frozen = false;
+	}
+	else{
+		btn.style = 'border-style:inset';
+		btn.innerHTML = 'UNFREEZE';
+		frozen = true;
+	}
+}
+
+
+function changeAmplitude(value){
+	curpos = value;
+	if (value==100){
+		document.getElementById('amplitudeLabel').innerHTML = 'all prices/quotes shown';
+	}
+	else{
+		document.getElementById('amplitudeLabel').innerHTML = (value/10) + ' pips shown from top of book';
+	}
+}
+
+
+wrapper.getAuthentication()
+.then(function(resp){
+	getInterface();
+})
+.then(function(resp){
+	getPriceStreaming();
+});;
+
+
+
+</script>
+
+</body>
+</html>

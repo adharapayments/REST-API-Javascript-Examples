@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Bubbles</title>
+	<link rel="stylesheet" href="style.css">
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<link rel="stylesheet" href="http://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.css">
+	<script src="http://code.jquery.com/jquery-1.11.3.min.js"></script>
+	<script src="http://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.js"></script>
+</head>
+<body>
+
+<table width="100%">
+	<tr>
+		<th>
+			<button id="freezeButton" style="border-style:outset;" onclick="freeze(this)">FREEZE</button>
+		</th>
+		<th width="20%">
+			<label style="text-align: right">Select price amplitude:</label>
+		</th>
+		<th width="50%">
+			<input type="range" name="amplitude" id="amplitude" value="5" min="0" max="100" onchange="changeAmplitude(this.value)">
+		</th>
+		<th width="20%">
+			<label id="amplitudeLabel" style="text-align: left">0.5 pips shown from top of book</label>
+		</th>
+	</tr>
+</table>
+<div id="priceChart" style="height: 700px; width:100%;"></div>
+
+<script type="text/javascript" src="jquery.min.js"></script>
+<script type="text/javascript" src="jquery-ajaxreadystate.js"></script>
+<script type="text/javascript" src="2.0.0-crypto-sha1.js"></script>
+<script type="text/javascript" src="q.js"></script>
+<script type="text/javascript" src="wrapper.js"></script>
+<script src="http://code.highcharts.com/highcharts.js"></script>
+<script src="http://code.highcharts.com/highcharts-more.js"></script>
+<script src="http://code.highcharts.com/modules/exporting.js"></script>
+<script type="text/javascript">
+
+curpos = 5;
+var frozen = false;
+var pips=5;
+var d=(1/(Math.pow(10, pips)));
+var sec="EUR/USD";
+//var colorList = new String[]{"green","red","blue","yellow","orange","pink","gray"};
+var colorList = ["rgba(0,128,0,1.0)","rgba(255,0,0,1.0)","rgba(0,0,255,1.0)","rgba(255,255,0,1.0)","rgba(255,69,0,1.0)","rgba(255,20,147,1.0)","rgba(128,128,128,1.0)"];
+
+var priceChart = new Highcharts.Chart("priceChart",{
+
+	//type: 'bubble',
+
+	chart: {
+		zoomType: 'xy'
+	},
+
+	title: {
+		text: sec + " Prices"
+	},
+	xAxis: {
+		labels: {
+			enabled: false
+		},
+		tickLength:0,
+		maxPadding: 0.5,
+		minPadding: 0.5
+	},
+	yAxis: [
+		{
+			title: {
+				text: 'Prices'
+			},
+			lineWidth: 1,
+			gridLineDashStyle: 'longdash',
+			labels: {
+				formatter: function() {
+					return this.value.toFixed(pips);
+				}
+			},
+			plotLines: [
+				{
+					id: 'askPlotLine',
+					value: 0, 
+					dashStyle: 'solid',
+					width: 2,
+					color: '#808080',
+					label: {
+						//align: 'right',
+						align: 'left',
+						style: {
+							fontStyle: 'bold'
+						},
+						text: 'ask',
+						x: 0
+					}
+				}
+			]
+		}
+	],
+	tooltip: {
+		formatter: function (){
+			var s = '<b>'+ this.series.name +'</b>' +
+			'<br/><b>Price: </b>'+ this.y.toFixed(pips) +
+			'<br/><b>Liquidity: </b>'+ this.point.z + '';
+			return s;
+		},
+            valueDecimals: pips
+        },
+	plotOptions: {
+		bubble: {
+			minSize: 10,
+			maxSize: 50,
+			lineWidth:1,
+			gridLineDashStyle: 'longdash',
+			lineColor:'grey'
+			},
+		series: {
+			animation: true,
+			dataLabels: {
+				formatter: function (){
+					return this.point.name;
+				},
+				enabled: true,
+				style: {
+					textShadow: 'none'
+				},
+				color: 'black'
+			}
+		}
+        }
+});
+
+//var optionA = {options: {bubble:{minSize: 10, maxSize: 50, lineWidth:1, lineColor:'grey'}, series:{animation: false, dataLabels:{formatter: function (){return this.point.name;}, enabled: true, style: { textShadow: 'none' }, color: 'orange'}}}}
+//var optionB = {options: {bubble:{minSize: 5, maxSize: 20, lineWidth:1, lineColor:'grey'}, series:{animation: false, dataLabels:{formatter: function (){return this.point.name;}, enabled: true, style: { textShadow: 'none' }, color: 'pink'}}}}
+
+var wrapper = Object.create(Wrapper);
+wrapper.url = "http://actfx.adhara.io:81";
+wrapper.user = "adhara";
+wrapper.password = "adhara";
+
+
+function getInterface(){
+	wrapper.getInterface(updateInterfaces);
+}
+
+function getAccount(){
+	wrapper.getAccount(updateAccounts);
+}
+
+function updateInterfaces(entry){
+	var ask;
+	var bid;
+	var index = 0;
+	if (entry.hasOwnProperty('getInterfaceResponse')) {
+		if (entry.getInterfaceResponse.hasOwnProperty('tinterface')) {
+			entry.getInterfaceResponse.tinterface.forEach(function(ti) {
+				priceChart.addSeries({
+					id: 'ask_' + ti.name,
+					name: 'ask_' + ti.name,
+					type: 'bubble',
+					//color: colorList[index],
+					marker: {
+						fillColor: {
+							radialGradient: { cx: 0.5, cy: 0.0, r: 1.0 },
+							stops: [
+								[0, 'rgba(255,255,255,0.5)'],
+								[1, colorList[index]]
+							]
+						}
+					},
+					data: []
+				});
+				priceChart.addSeries({
+					id: 'bid_' + ti.name,
+					name: 'bid_' + ti.name,
+					type: 'bubble',
+					//color: colorList[index],
+					marker: {
+						fillColor: {
+							radialGradient: { cx: 0.5, cy: 1.0, r: 1.0 },
+							stops: [
+								[0, 'rgba(255,255,255,0.5)'],
+								[1, colorList[index]]
+							]
+						}
+					},
+					data: []
+				});
+				index++;
+			});
+			/*
+			priceChart.addSeries({
+				id: 'askSpline',
+				name: 'askSpline',
+				type: 'spline',
+				dashStyle: 'dot',
+				lineWidth: 1,
+				color: '#808080',
+				data: []
+			});
+			priceChart.addSeries({
+				id: 'bidSpline',
+				name: 'bidSpline',
+				type: 'spline',
+				dashStyle: 'dot',
+				lineWidth: 1,
+				color: '#808080',
+				data: []
+			});
+			*/
+		}
+	}
+}
+
+function updateAccounts(entry){
+	var ask;
+	var bid;
+	if (entry.hasOwnProperty('getAccountResponse')) {
+		if (entry.getAccountResponse.hasOwnProperty('account')) {
+			
+		}
+	}
+}
+
+
+
+function getPriceStreaming(){
+	wrapper.getPriceStreaming( [sec], null, "fab", 5, 1000, function processPrices(entry) {
+			if(frozen){
+				return;
+			}
+			if (entry.hasOwnProperty('getPriceResponse')) {
+				bestAsk=0;
+				bestBid=0;
+				dpsPriceAsk = [];
+				dpsPriceBid = [];
+				var bestAskMap = {};
+				var bestBidMap = {};
+				var askPrices = [];
+				var bidPrices = [];
+				var askSplineSerie = [];
+				var bidSplineSerie = [];
+				var top=0;
+				var low=0;
+				if (entry.getPriceResponse.hasOwnProperty('tick')) {
+					entry.getPriceResponse.tick.forEach(function(tick) {
+						if (tick.security==sec && tick.side=="ask" && parseFloat(tick.price)>1.10) {
+							if (!bestAskMap.hasOwnProperty(tick.tinterface)){
+								bestAskMap[tick.tinterface] = tick.price;
+								if (bestAsk==0 || tick.price<bestAsk){
+									bestAsk = tick.price;
+								}
+							}
+							var tick = {'ti':tick.tinterface, 'price':tick.price, 'liq':tick.liquidity};
+							askPrices.push(tick);
+						}
+						if (tick.security==sec && tick.side=="bid" && parseFloat(tick.price)>1.10) {
+							if (!bestBidMap.hasOwnProperty(tick.tinterface)){
+								bestBidMap[tick.tinterface] = tick.price;
+								if (bestBid==0 || tick.price>bestBid){
+									bestBid = tick.price;
+								}
+							}
+							var tick = {'ti':tick.tinterface, 'price':tick.price, 'liq':tick.liquidity};
+							bidPrices.push(tick);
+						}
+					});
+					//priceChart.render();
+				}
+
+
+				//console.log(bestAskMap);
+				//console.log(bestBidMap);
+				//console.log(askPrices);
+				//console.log(bidPrices);
+				var sortedAskTI=[];
+				for (var i = 0; i<Object.keys(bestAskMap).length; i++){
+					var best = 0;
+					var bestTI = "";
+					for (var ti in bestAskMap) {
+						if ((best==0 || bestAskMap[ti]<best) && bestAskMap[ti]>0){
+							best = bestAskMap[ti];
+							bestTI = ti;
+						}
+					}
+					sortedAskTI.push(bestTI);
+					bestAskMap[bestTI]=-1;
+				}
+				//console.log(sortedAskTI);
+
+				var sortedBidTI=[];
+				for (var i = 0; i<Object.keys(bestBidMap).length; i++){
+					var best = 0;
+					var bestTI = "";
+					for (var ti in bestBidMap) {
+						if ((best==0 || bestBidMap[ti]>best) && bestBidMap[ti]>0){
+							best = bestBidMap[ti];
+							bestTI = ti;
+						}
+					}
+					sortedBidTI.push(bestTI);
+					bestBidMap[bestTI]=-1;
+				}
+				//console.log(sortedBidTI);
+
+				var asktob=0;
+				var bidtob=0;
+				var asklimit=0;
+				var bidlimit=0;
+				for (var j = 0; j<sortedAskTI.length; j++){
+					var ti = sortedAskTI[j];
+					var dpsPriceAsk = [];
+					var tiName = ti;
+					for (var i = 0; i<askPrices.length; i++){
+						var tick = askPrices[i];
+						if (tick.ti==ti){
+							if (asktob==0){
+								asktob=tick.price;
+								asklimit=asktob+(curpos*d);
+								priceChart.yAxis[0].options.plotLines[0].value=asktob;
+							}
+							if (curpos==100 || tick.price <= asklimit){
+								dpsPriceAsk.push({
+									id: 'ask' + ti,
+									name: tiName,
+									x: j + 0.4,
+									y: parseFloat(tick.price),
+									z: parseFloat(tick.liq)
+								});
+								if (tiName!=""){
+									askSplineSerie.push({
+										x: j + 0.4,
+										y: parseFloat(tick.price)
+									});
+								}
+								tiName = "";
+								if (top==0 || tick.price>top){
+									top=tick.price;
+								}
+							}
+						}
+					}
+					priceChart.get('ask_' + ti).setData(dpsPriceAsk);
+				}
+				//priceChart.get('askSpline').setData(askSplineSerie);
+
+				for (var j = 0; j<sortedBidTI.length; j++){
+					var ti = sortedBidTI[j];
+					var dpsPriceBid = [];
+					var tiName = ti;
+					for (var i = 0; i<bidPrices.length; i++){
+						var tick = bidPrices[i];
+						if (tick.ti==ti){
+							if (bidtob==0){
+								bidtob=tick.price;
+								bidlimit=bidtob-(curpos*d);
+							}
+							if (curpos==100 || tick.price >= bidlimit){
+								dpsPriceBid.push({
+									id: 'bid' + ti,
+									name: tiName,
+									x: j + 0.6,
+									y: parseFloat(tick.price),
+									z: parseFloat(tick.liq)
+								});
+								if (tiName!=""){
+									bidSplineSerie.push({
+										x: j + 0.6,
+										y: parseFloat(tick.price)
+									});
+								}
+								tiName = "";
+								if (low==0 || tick.price<top){
+									low=tick.price;
+								}
+							}
+						}
+					}
+					priceChart.get('bid_' + ti).setData(dpsPriceBid);
+				}
+				//priceChart.get('bidSpline').setData(bidSplineSerie);
+
+				if (top-low>20){
+					//priceChart.options=optionB;
+				}
+				else{
+					//priceChart.options=optionA;
+				}
+
+			}
+		}
+	);
+}
+
+
+function freeze(btn){
+	if (frozen){
+		btn.style = 'border-style:outset';
+		btn.innerHTML = 'FREEZE';
+		frozen = false;
+	}
+	else{
+		btn.style = 'border-style:inset';
+		btn.innerHTML = 'UNFREEZE';
+		frozen = true;
+	}
+}
+
+function changeAmplitude(value){
+	curpos = value;
+	if (value==100){
+		document.getElementById('amplitudeLabel').innerHTML = 'all prices/quotes shown';
+	}
+	else{
+		document.getElementById('amplitudeLabel').innerHTML = (value/10) + ' pips shown from top of book';
+	}
+}
+
+wrapper.getAuthentication()
+.then(function(resp){
+	getInterface();
+	getAccount();
+	getPriceStreaming();
+});
+
+
+
+</script>
+
+</body>
+</html>

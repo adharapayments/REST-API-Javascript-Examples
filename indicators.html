@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Javascript wrapper sample</title>
+	<link rel="stylesheet" href="style.css">
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<link rel="stylesheet" href="http://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.css">
+	<script src="http://code.jquery.com/jquery-1.11.3.min.js"></script>
+	<script src="http://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.js"></script>
+</head>
+<body>
+
+<table width="100%">
+	<tr>
+		<th>
+			<button id="freezeButton" style="border-style:outset;" onclick="freeze(this)">FREEZE</button>
+		</th>
+		<th>
+			<label style="text-align: right">Select trading interface:</label>
+		</th>
+		<th>
+			<select id="tiSel" onchange="selTI()">
+				<option value="">ALL</option>
+			</select>
+		</th>
+		<th>
+			<label id="indSelLabel" style="text-align: right">Select indicators:</label>
+		</th>
+		<th>
+			<select id="indSel">
+				<option value="BBANDs">BBANDs</option>
+			</select>
+		</th>
+		<th>
+			<button id="show" onclick="show()">SHOW</button>
+		</th>
+	</tr>
+</table>
+<div id="priceChart" style="height: 700px; width:100%;"></div>
+
+<script type="text/javascript" src="jquery.min.js"></script>
+<script type="text/javascript" src="jquery-ajaxreadystate.js"></script>
+<script type="text/javascript" src="2.0.0-crypto-sha1.js"></script>
+<script type="text/javascript" src="q.js"></script>
+<script type="text/javascript" src="wrapper.js"></script>
+<script src="https://code.highcharts.com/stock/highstock.js"></script>
+<script src="https://code.highcharts.com/stock/modules/exporting.js"></script>
+<script type="text/javascript">
+
+var lastStream = 0;
+var frozen = false;
+var pips=5;
+var sec="EUR/USD";
+var colorList = ["green","red","blue","yellow","orange","pink","gray"];
+//var colorList = ["rgba(0,128,0,0.3)","rgba(255,0,0,0.3)","rgba(0,0,255,0.3)","rgba(255,255,0,0.3)","rgba(255,69,0,0.3)","rgba(255,20,147,0.3)","rgba(128,128,128,0.3)"];
+var tiNames = [];
+var dpsInd = [];
+var dpsIndVol = [];
+var dpsIndBA = [];
+var dpsIndBB = [];
+var dpsIndBC = [];
+var dpsIndADX = [];
+
+var indicatorChart = new Highcharts.StockChart("priceChart",{
+
+	chart: {
+		zoomType: 'xy'
+	},
+
+	title: {
+		text: sec + " Prices"
+	},
+	yAxis: [
+		{
+			title: {
+				text: 'Prices'
+			},
+			height: '75%',
+			lineWidth: 1,
+			gridLineDashStyle: 'longdash',
+			plotLines: [
+				{
+					id: 'askPlotLine',
+					value: 0,
+					dashStyle: 'solid',
+					width: 1,
+					color: 'blue',
+					label: {
+						align: 'left',
+						style: {
+							fontStyle: 'bold'
+						},
+						text: 'ask', 
+						x: 0
+					}
+				}, {
+					id: 'bidPlotLine',
+					value: 0,
+					dashStyle: 'solid',
+					width: 1,
+					color: 'red',
+					label: {
+						align: 'left',
+						style: {
+							fontStyle: 'bold'
+						},
+						text: 'bid', 
+						x: 0
+					}
+				}
+			],
+			labels: {
+				formatter: function() {
+					return this.value.toFixed(pips);
+				}
+			}
+		}, {
+			title: {
+				text: 'Volume'
+			},
+			top: '80%',
+			height: '20%',
+			offset: 0,
+			lineWidth: 2
+		}
+	],
+	tooltip: {
+            valueDecimals: pips
+        },
+	
+
+
+
+	rangeSelector : {
+		buttons:[
+			{type:'minute',count:1,text:'1m'},
+			{type:'minute',count:5,text:'5m'},
+			{type:'minute',count:10,text:'10m'},
+			{type:'minute',count:30,text:'30m'},
+			{type:'hour',count:1,text:'1h'},
+			{type:'all',count:1,text:'All'}
+		],
+		selected:5,
+		inputEnabled:true
+	},
+
+
+	legend: {
+		enabled: true,
+		labelFormatter: function () {
+			return this.name.split("-")[0];
+		}
+	}
+});
+
+var wrapper = Object.create(Wrapper);
+wrapper.url = "http://actfx.adhara.io:81";
+wrapper.user = "adhara";
+wrapper.password = "adhara";
+
+
+function getInterface(){
+	wrapper.getInterface(updateInterfaces);
+}
+
+function getAccount(){
+	wrapper.getAccount(updateAccounts);
+}
+
+function updateInterfaces(entry){
+	var ask;
+	var bid;
+	var index = 0;
+	tiNames = [];
+	if (entry.hasOwnProperty('getInterfaceResponse')) {
+		if (entry.getInterfaceResponse.hasOwnProperty('tinterface')) {
+			var tiSel = document.getElementById("tiSel");
+			entry.getInterfaceResponse.tinterface.forEach(function(ti) {
+				var tiOption = new Option(ti.name, ti.name);
+				tiSel.add(tiOption);
+				tiNames.push(ti.name);
+			});
+		}
+	}
+	show();
+}
+
+function updateAccounts(entry){
+	var ask;
+	var bid;
+	if (entry.hasOwnProperty('getAccountResponse')) {
+		if (entry.getAccountResponse.hasOwnProperty('account')) {
+			
+		}
+	}
+}
+
+
+
+function getIndicatorStreaming(tis, inds, streamId){
+	wrapper.getIndicatorStreaming( [sec], tis, inds, 50, 3, function processPrices(entry) {
+			if (streamId!=lastStream){
+				console.log("Streaming stopped");
+				throw "STOP";
+			}
+
+			if (entry.hasOwnProperty('getIndicatorResponse')) {
+				if (entry.getIndicatorResponse.hasOwnProperty('tick')) {
+					entry.getIndicatorResponse.tick.forEach(function(tick) {
+						var ts=0;
+						var tsArray=[];
+						if (tick.hasOwnProperty('candle')) {
+							var ti = tick.tinterface;
+							tick.candle.forEach(function(candle) {
+								ts = parseFloat(candle.timestamp)*1000;
+								tsArray.push(ts);
+								if (tick.security==sec) {
+									dpsInd.push([
+										ts,
+										parseFloat(candle.open)/100000,
+										parseFloat(candle.high)/100000,
+										parseFloat(candle.low)/100000,
+										parseFloat(candle.close)/100000
+									]);
+									dpsIndVol.push([
+										ts,
+										candle.ticks
+									]);
+									if (!frozen){
+										indicatorChart.get(ti).setData(dpsInd);
+										indicatorChart.get('Volume_' + ti).setData(dpsIndVol);
+									}
+								}
+							});
+						}
+						if (tis!=null && tick.hasOwnProperty('indicator')) {
+							tick.indicator.forEach(function(indicator) {
+								if (indicator.name=="BBANDS") {
+									var i=0;
+									for (var x in tsArray){
+										dpsIndBA.push([
+											tsArray[i],
+											indicator.upperband[i]/100000
+										]);
+										dpsIndBB.push([
+											tsArray[i],
+											indicator.middleband[i]/100000
+										]);
+										dpsIndBC.push([
+											tsArray[i],
+											indicator.lowerband[i]/100000
+										]);
+										if (!frozen){
+											indicatorChart.get('BBAND-upperbandSerie').setData(dpsIndBA);
+											indicatorChart.get('BBAND-middlebandSerie').setData(dpsIndBB);
+											indicatorChart.get('BBAND-lowerbandSerie').setData(dpsIndBC);
+										}
+										i++;
+									}
+								}
+								if (indicator.name=="ADX") {
+									var i=0;
+									for (var x in tsArray){
+										dpsIndADX.push([
+											tsArray[i],
+											indicator.value[i]/100000
+										]);
+										if (!frozen){
+											indicatorChart.get('ADXSerie').setData(dpsIndADX);
+										}
+										i++;
+									}
+								}
+							});
+						}
+					});
+					indicatorChart.render();
+				}
+			}
+		}
+	);
+}
+
+
+function freeze(btn){
+	if (frozen){
+		btn.style = 'border-style:outset';
+		btn.innerHTML = 'FREEZE';
+		frozen = false;
+	}
+	else{
+		btn.style = 'border-style:inset';
+		btn.innerHTML = 'UNFREEZE';
+		frozen = true;
+	}
+}
+
+function selTI(){
+	if (tiSel.value!=""){
+		indSelLabel.visible=true;
+		indSel.visible=true;
+	}
+	else{
+		indSelLabel.visible=false;
+		indSel.visible=false;
+	}
+}
+
+function show(){
+	lastStream++;
+	while(indicatorChart.series.length > 0){
+		indicatorChart.series[0].remove(true);
+	}
+	var inds = ["BBANDS"];
+	var tis = null;
+	var ti = tiSel.value;
+	dpsInd = [];
+	dpsIndVol = [];
+	dpsIndBA = [];
+	dpsIndBB = [];
+	dpsIndBC = [];
+	dpsIndADX = [];
+	if (ti!=null && ti!=""){
+		tis=[ti];
+		inds = ["BBANDS","ADX"];
+		indicatorChart.addSeries({
+			id: ti,
+			name: ti,
+			type: 'candlestick',
+			color: 'green',
+			data: []
+		});
+		indicatorChart.addSeries({
+			id: 'Volume_' + ti,
+			name: 'Volume_' + ti,
+			type: 'column',
+			color: 'green',
+			data: [],
+			yAxis: 1
+		});
+		indicatorChart.addSeries({
+			id: 'BBAND-upperbandSerie',
+			name: 'BBAND-upperband',
+			type: 'line',
+			color: 'orange',
+			data: [],
+			yAxis: 0
+		});
+		indicatorChart.addSeries({
+			linkedTo:':previous',
+			id: 'BBAND-middlebandSerie',
+			name: 'BBAND-middleband',
+			type: 'line',
+			color: 'orange',
+			data: [],
+			yAxis: 0
+		});
+		indicatorChart.addSeries({
+			linkedTo:':previous',
+			id: 'BBAND-lowerbandSerie',
+			name: 'BBAND-lowerband',
+			type: 'line',
+			color: 'orange',
+			data: [],
+			yAxis: 0
+		});
+		indicatorChart.addSeries({
+			id: 'ADXSerie',
+			name: 'ADX',
+			type: 'line',
+			color: 'blue',
+			data: [],
+			yAxis: 0
+		});
+	}
+	else{
+		for (var i = 0; i < tiNames.length; i++){
+			var tiName = tiNames[i];
+			indicatorChart.addSeries({
+				id: tiName,
+				name: tiName,
+				type: 'candlestick',
+				color: colorList[i],
+				data: []
+			});
+			indicatorChart.addSeries({
+				id: 'Volume_' + tiName,
+				name: 'Volume_' + tiName,
+				type: 'column',
+				color: colorList[i],
+				data: [],
+				yAxis: 1
+			});
+		}
+	}
+	getIndicatorStreaming(tis, inds, lastStream);
+}
+
+
+
+wrapper.getAuthentication()
+.then(function(resp){
+	getInterface();
+	getAccount();
+	//show();
+});
+
+
+
+</script>
+
+</body>
+</html>

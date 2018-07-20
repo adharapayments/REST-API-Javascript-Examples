@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Equity</title>
+	<link rel="stylesheet" href="style2.css">
+	<meta charset="utf-8">
+</head>
+<body>
+
+<table width="100%">
+	<tr>
+		<th>
+			<label style="text-align: right">Select account:</label>
+		</th>
+		<th>
+			<select id="accSel" onchange="changeSecPos()">
+				<option value="ALL">ALL</option>
+			</select>
+		</th>
+	</tr>
+</table>
+			<table width="100%" class="scroll">
+				<caption style="font-size: 25px;"><b>Streaming Security Position</b></caption>
+				<thead>
+					<tr>
+						<th width="24%">Security</th>
+						<th width="24%">Position</th>
+						<th width="24%">Side</th>
+						<th width="24%">P&L</th>
+					</tr>
+				</thead>
+				<tbody id="streamingSecurityPositionTable" style="height:200px;">
+				</tbody>
+			</table>
+
+<script type="text/javascript" src="jquery.min.js"></script>
+<script type="text/javascript" src="jquery-ajaxreadystate.js"></script>
+<script type="text/javascript" src="2.0.0-crypto-sha1.js"></script>
+<script type="text/javascript" src="q.js"></script>
+<script type="text/javascript" src="wrapper.js"></script>
+<script src="https://code.highcharts.com/stock/highstock.js"></script>
+<script src="https://code.highcharts.com/stock/modules/exporting.js"></script>
+<script type="text/javascript">
+
+var wrapper = Object.create(Wrapper);
+wrapper.url = "http://actfx.adhara.io:81";
+wrapper.user = "adhara";
+wrapper.password = "adhara";
+
+var accSelected=accSel.value;
+
+function getAccount(){
+	wrapper.getAccount(updateAccounts);
+}
+
+function updateAccounts(entry){
+	var ask;
+	var bid;
+	if (entry.hasOwnProperty('getAccountResponse')) {
+		if (entry.getAccountResponse.hasOwnProperty('account')) {
+			var accSel = document.getElementById("accSel");
+			entry.getAccountResponse.account.forEach(function(acc) {
+				var accOption = new Option(acc.name, acc.name);
+				accSel.add(accOption);
+			});
+			
+		}
+	}
+}
+
+var secPos=[];
+function getPositionStreaming(){
+	wrapper.getPositionStreaming( null, null, null, 1000, function processPosition(entry) {
+			if (entry.hasOwnProperty('getPositionResponse')) {
+				if (entry.getPositionResponse.hasOwnProperty('securityposition')) {
+					var changed = false;
+					entry.getPositionResponse.securityposition.forEach(function(securityposition) {
+						if (securityposition.account=="<AGGREGATED>"){
+							securityposition.account = "ALL";
+						}
+console.log(securityposition.account + "-" + accSelected);
+						if(securityposition.account==accSelected){
+							changed = true;
+						}
+						var newrow = true;
+						for (var i=0; i<secPos.length; i++){
+//console.log(secPos[i][0] + "-" + securityposition.account + "-" + secPos[i][1] + "-" + securityposition.security);
+							if (secPos[i][0] == securityposition.account && secPos[i][1] == securityposition.security){
+								newrow = false;
+								secPos[i][2] = securityposition.exposure;
+								secPos[i][3] = securityposition.price;
+								secPos[i][4] = securityposition.side;
+								secPos[i][5] = securityposition.pl;
+								break;
+							}
+						}
+						if (newrow==true){
+							secPos.push([
+								securityposition.account,
+								securityposition.security,
+								securityposition.exposure,
+								securityposition.price,
+								securityposition.side,
+								securityposition.pl
+							]);
+						}
+					});
+					if (changed==true){
+						showSecPos();
+					}
+				}
+			}
+		}
+	);
+}
+
+
+function changeSecPos(){
+	accSelected=accSel.value;
+console.log("SELECTED-" + accSelected);
+	showSecPos();
+}
+
+function showSecPos(){
+	//accSelected=accSel.value;
+//console.log("SELECTED-" + accSelected);
+	var streamingSecurityPositionTable = document.getElementById("streamingSecurityPositionTable");
+	for (var i=0; i<streamingSecurityPositionTable.rows.length; i++){
+		//streamingSecurityPositionTable.deleteRow(i);
+	}
+	for (var i=0; i<secPos.length; i++){
+		if (secPos[i][0]==accSelected){
+			var row = streamingSecurityPositionTable.insertRow(streamingSecurityPositionTable.rows.length);
+			var cellSec = row.insertCell(-1);
+			cellSec.innerHTML = secPos[i][1];
+			var cellExp = row.insertCell(-1);
+			cellExp.innerHTML = secPos[i][2] + '@' + secPos[i][3];
+			var cellSid = row.insertCell(-1);
+			cellSid.innerHTML = secPos[i][4];
+			var cellPl = row.insertCell(-1);
+			cellPl.innerHTML = secPos[i][5];
+			cellSec.style.width="24%";
+			cellExp.style.width="24%";
+			cellSid.style.width="24%";
+			cellPl.style.width="24%";
+		}
+	}
+}
+
+
+wrapper.getAuthentication()
+.then(function(resp){
+	getAccount();
+	getPositionStreaming();
+});
+
+
+
+</script>
+
+</body>
+</html>

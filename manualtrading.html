@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+
+.fragment_MT {
+    width: 49%;
+    float: left;
+    border: 1px solid #ccc;
+    color: #555;
+    display: block;
+    padding: 10px;
+    box-sizing: border-box;
+    text-decoration: none;
+    display:none;
+//    padding: 5px 5px 5px 5px;
+    margin:1px;
+}
+
+.fragment_MT:hover {
+    box-shadow: 2px 2px 5px rgba(0,0,0,.2);
+}
+
+.fragment_MT table {
+    width: 100%;
+    color: #000;
+    table-layout: fixed;
+}
+
+.table_MTconf {
+    width: 100%;
+    text-align: left;
+    font-size: 20px;
+    font-weight: bold;
+    border: 1px solid #ccc;
+    //table-layout: fixed;
+    //display: inline-block;
+}
+
+.table_MTconf select{
+    width: 100%;
+    height: 34px;
+}
+
+.table_MTconf input{
+    width: 40%;
+    //height: 34px;
+}
+
+.table_MTconf label{
+    font-size: 14px;
+}
+
+.table_MT1 {
+    float: right;
+    font-size: 20px;
+    font-weight: bold;
+}
+
+.table_MT2 td {
+    text-align: center;
+    font-size: 32px;
+    font-weight: bold;
+}
+
+.table_MT3 td {
+    text-align: left;
+    //font-size: 14px;
+    border: 1px solid #ccc;
+}
+
+.table_MT4 button {
+    width: 100%;
+    text-align: center;
+    border: 1px solid #ccc;
+}
+
+.close_MT {
+    float:right;
+    display:inline-block;
+    padding:2px 5px;
+    background:#ccc;
+    cursor: pointer;
+}
+
+.highpips {
+    font-size:10pt;
+}
+.lowpips {
+    font-weight:bold;
+    font-size:22pt;
+}
+.restpips {
+    font-size:14pt;
+}
+
+button {
+    background: none repeat scroll 0 0 rgba(0, 123, 186, 0.80);
+    color: #FFF;
+    cursor: pointer;
+    font-family: "Lucida Grande","Lucida Sans Unicode",Tahoma,sans-serif;
+    font-size: 12px;
+    font-weight: normal;
+    line-height: 1.5;
+    padding: 6px 16px;
+    text-transform: uppercase;
+    border-radius: 4px;
+    height: 34px;
+}
+button[disabled]:hover {
+    background: none repeat scroll 0 0 #e3e3e3;
+    box-shadow: none;
+    color: #FFF;
+}
+button:hover {
+    background: none repeat scroll 0 0 rgba(0, 123, 186, 0.95);
+    box-shadow: none;
+    color: #FFF;
+}
+button:focus {
+    background: none repeat scroll 0 0 rgba(0, 123, 186, 0.95);
+    box-shadow: none;
+    color: #FFF;
+}
+div {
+    padding: 5px 5px 5px 5px;
+}
+select {
+    cursor: pointer;
+    font-family: "Lucida Grande","Lucida Sans Unicode",Tahoma,sans-serif;
+    font-size: 12px;
+    font-weight: normal;
+    line-height: 1.5;
+    //padding: 6px 16px;
+    //text-transform: uppercase;
+    border-radius: 4px;
+    //margin: 5px 5px 5px 5px;
+    //border: 1px solid #ccc;
+    background: transparent;
+    //width: 150px;
+    font-size: 16px;
+    height: 34px;
+}
+input {
+    font-family: "Lucida Grande","Lucida Sans Unicode",Tahoma,sans-serif;
+    font-size: 12px;
+    font-weight: normal;
+    line-height: 1.5;
+    border-radius: 4px;
+    background: transparent;
+    font-size: 16px;
+    //height: 34px;
+}
+</style>
+</head>
+<body>
+
+<div style="float: left;width:27%;height: 300px;overflow-y: hidden;overflow-x: hidden;border: 1px solid #ccc">
+	<table class="table_MTconf">
+		<tr>
+			<td>
+				Trading Interface:
+			</td>
+			<td>
+				<select id="tiSel"/>
+			</td>
+		</tr>
+		<tr>
+			<td>
+				Quantity:
+			</td>
+			<td >
+				<input type="number" id="quantity" value="100000" step="100000" onchange="javascript: changeQua()"/>
+				<label id="quantityText"/>
+			</td>
+		</tr>
+		<tr>
+			<td>
+				Order type:
+			</td>
+			<td>
+				<select id="typeSel">
+					<option value="market">Market</option>
+					<option value="limit">Limit</option>
+				</select>
+			</td>
+		</tr>
+		<tr>
+			<td>
+				Limit by:
+			</td>
+			<td >
+				<input lang="en-US" type="number" id="limitpips" value="0.5" step="0.1"/>
+				<label>pips (worse than current)</label>
+			</td>
+		</tr>
+		<tr>
+			<td>
+				Validity:
+			</td>
+			<td >
+				<select id="valSel">
+					<option value="day">Day</option>
+					<option value="good till cancel">Good till Cancel</option>
+					<option value="inmediate or cancel">Inmediate or Cancel</option>
+					<option value="fill or kill">Fill or Kill</option>
+				</select>
+			</td>
+		</tr>
+	</table>
+</div>
+<div style="float: left;width:46%;height: 300px;overflow-y: scroll;overflow-x: hidden;border: 1px solid #ccc">
+	<select id="secSel"></select>
+	<button type="submit" id="add" onclick="javascript: addSecurity()">ADD</button>
+	<br />
+	<br />
+	<div id="original" class="fragment_MT">
+		<table class="table_MT1">
+			<tr>
+				<td name="secNameLabel">Sec</td>
+				<td>
+					<span name="delta">&#916;</span>
+					<span class="close_MT" name="close" onclick="this.parentNode.parentNode.parentNode.parentNode.parentNode.parentNode.removeChild(this.parentNode.parentNode.parentNode.parentNode.parentNode); javascript:delSecurity(this.value); return false;">x</span>
+				</td>
+			</tr>
+		</table>
+		<table class="table_MT2">
+			<tr>
+				<td name="priceBid">0</td>
+				<td name="priceAsk">0</td>
+			</tr>
+		</table>
+		<table class="table_MT3">
+			<tr>
+				<td name="liqBid">0</td>
+				<td name="liqAsk">0</td>
+			</tr>
+		</table>
+		<table class="table_MT4">
+			<tr>
+				<td>
+					<button name="sellBtn">SELL</button>
+				</td>
+				<td>
+					<button name="buyBtn">BUY</button>
+				</td>
+			</tr>
+		</table>
+	</div>
+</div>
+<script type="text/javascript" src="jquery.min.js"></script>
+<script type="text/javascript" src="jquery-ajaxreadystate.js"></script>
+<script type="text/javascript" src="2.0.0-crypto-sha1.js"></script>
+<script type="text/javascript" src="q.js"></script>
+<script type="text/javascript" src="wrapper.js"></script>
+<script>
+	var wrapper;
+	var lastStream=0;
+	wrapper = Object.create(Wrapper);
+	wrapper.url = "http://actfx.adhara.io:81";
+	wrapper.user = "adhara";
+	wrapper.password = "adhara";
+	wrapper.getAuthentication()
+	.then(function(resp){
+		getInterface();
+		getAccount();
+		init();
+	});
+
+	var params = ["AUD/USD;5","EUR/AUD;5","EUR/CAD;5","EUR/CHF;5","EUR/GBP;5","EUR/JPY;3","EUR/USD;5","GBP/JPY;3","GBP/USD;5","USD/CAD;5","USD/JPY;3"]
+	var secList = [];
+	var elems = ["delta", "priceBid", "priceAsk", "liqBid", "liqAsk", "sellBtn", "buyBtn"];
+	var secPips = {};
+	var secBidPrices = {};
+	var secAskPrices = {};
+
+	function getInterface(){
+		wrapper.getInterface(updateInterfaces);
+	}
+
+	function getAccount(){
+		wrapper.getAccount(updateAccounts);
+	}
+
+	function updateInterfaces(entry){
+		if (entry.hasOwnProperty('getInterfaceResponse')) {
+			if (entry.getInterfaceResponse.hasOwnProperty('tinterface')) {
+				var tiSel = document.getElementById("tiSel");
+				entry.getInterfaceResponse.tinterface.forEach(function(tinterface) {
+					var optionTi = new Option(tinterface.name, tinterface.name);
+					tiSel.add(optionTi);
+				});
+			}
+		}
+	}
+
+	function updateAccounts(entry){
+		if (entry.hasOwnProperty('getAccountResponse')) {
+			if (entry.getAccountResponse.hasOwnProperty('account')) {
+				entry.getAccountResponse.account.forEach(function(account) {
+					// Nothing
+				});
+			}
+		}
+	}
+
+	function init(){
+		for (var i=0; i<params.length; i++){
+			var param = params[i];
+			var secName = param.split(";")[0];
+			var pips = param.split(";")[1];
+			console.log(secName);
+			var optionSec = new Option(secName, secName);
+			secSel.add(optionSec);
+			secPips[secName]=pips;
+		}
+		addSec("EUR/USD");
+		addSec("EUR/GBP");
+		addSec("GBP/USD");
+		addSec("EUR/JPY");
+		addSec("GBP/JPY");
+		reloadPrices();
+		changeQua();
+	}
+
+	function changeQua(){
+		//quantity.value = quantity.value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+		//alert(quantity.value.toLocaleString('en'));
+		//alert(quantity.value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ","));
+		//quantity.value = quantity.value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+		var qua = quantity.value;
+		var quatext;
+		if (qua<1000){
+			quatext=qua;
+		}
+		if (qua>=1000 && qua<1000000){
+			quatext=(qua/1000).toFixed(1) + "K";
+		}
+		if (qua>=1000000){
+			quatext=(qua/1000000).toFixed(1) + "M";
+		}
+		quantityText.innerHTML = "(" + quatext + ")";
+	}
+
+	function addSecurity(){
+		var secName = secSel.value;
+		addSec(secName);
+		reloadPrices();
+	}
+
+	function addSec(secName){
+		if (secList.indexOf(secName)>=0){
+			alert("Sec exists");
+			return;
+		}
+		secList.push(secName);
+		console.log(secList);
+		var original = document.getElementById("original");
+		var cln = original.cloneNode(true);
+		cln.setAttribute("id", "div_" + secName);
+		cln.setAttribute("style", "display:block");
+
+		original.parentNode.appendChild(cln);
+
+		var secNameLabel = document.getElementsByName('secNameLabel')[1];
+		secNameLabel.setAttribute("id", "secNameLabel_" + secName);
+		secNameLabel.setAttribute("name", "secNameLabel_" + secName);
+		secNameLabel.innerHTML = secName;
+
+		var close = document.getElementsByName('close')[1];
+		close.setAttribute("name", "close_" + secName);
+		close.value = secName;
+
+		for (var i=0; i<elems.length; i++){
+			var elem = elems[i];
+			var delta = document.getElementsByName(elem)[1];
+			delta.setAttribute("id", elem + "_" + secName);
+			delta.setAttribute("name", elem + "_" + secName);
+		}
+		var sellBtn = document.getElementById("sellBtn_" + secName);
+		sellBtn.setAttribute("onclick", "setOrder('" + secName + "','sell')");
+		var buyBtn = document.getElementById("buyBtn_" + secName);
+		buyBtn.setAttribute("onclick", "setOrder('" + secName + "','buy')");
+	}
+
+	function delSecurity(value){
+		console.log("VALUE " + value);
+		var index = secList.indexOf(value)
+		secList.splice(index, 1);
+		console.log(secList);
+		reloadPrices();
+	}
+
+	function reloadPrices(){
+		lastStream++;
+		getPrices(lastStream);
+	}
+
+	function getPrices(streamId){
+		wrapper.getPriceStreaming( secList, null, "tob", 1, 1000, function processPrices(entry) {
+			if (streamId!=lastStream){
+				console.log("Streaming stopped");
+				throw "STOP";
+			}
+			var bidSecMap = {};
+			var askSecMap = {};
+			var bidSecLiqMap = {};
+			var askSecLiqMap = {};
+			if (entry.hasOwnProperty('getPriceResponse')) {
+				if (entry.getPriceResponse.hasOwnProperty('tick')) {
+					entry.getPriceResponse.tick.forEach(function(tick) {
+if (tick.price==0){
+return;
+}
+						var secName = tick.security;
+						if (tick.side=="bid") {
+							if (!bidSecMap.hasOwnProperty(tick.security)){
+								bidSecMap[tick.security]=tick.price;
+								bidSecLiqMap[tick.security]=tick.liquidity;
+							}
+							else{
+								if(tick.price>bidSecMap[tick.security]){
+									bidSecMap[tick.security]=tick.price;
+									bidSecLiqMap[tick.security]=tick.liquidity;
+								}
+							}
+						}
+						if (tick.side=="ask") {
+							if (!askSecMap.hasOwnProperty(tick.security)){
+								askSecMap[tick.security]=tick.price;
+								askSecLiqMap[tick.security]=tick.liquidity;
+							}
+							else{
+								if(tick.price<askSecMap[tick.security]){
+									askSecMap[tick.security]=tick.price;
+									askSecLiqMap[tick.security]=tick.liquidity;
+								}
+							}
+
+						}
+					});
+				}
+			}
+			for (var i=0; i<secList.length; i++){
+				var secName = secList[i];
+				secBidPrices[secName]=bidSecMap[secName];
+				secAskPrices[secName]=askSecMap[secName];
+				if (bidSecMap.hasOwnProperty(secName)){
+					var pips = secPips[secName];
+					var d=(1/(Math.pow(10, pips)));
+					var delta = document.getElementById("delta_" + secName);
+					if (delta!=null){
+						delta.innerHTML = "&#916;" + ((askSecMap[secName] - bidSecMap[secName])*Math.pow(10, (pips-1))).toFixed(1);
+						var priceBid = document.getElementById("priceBid_" + secName);
+						var bidPrice1 = Math.floor(bidSecMap[secName]*Math.pow(10, (pips-3)))/Math.pow(10, (pips-3));
+						if (pips==3){
+							bidPrice1 = bidPrice1 + ".";
+						}
+						if (pips>3){
+							bidPrice1 = bidPrice1.toFixed(pips-3);
+						}
+						var bidPrice2 = Math.floor(bidSecMap[secName]*Math.pow(10, (pips-1))%100);
+						if (bidPrice2<10){
+							bidPrice2 = "0" + bidPrice2;
+						}
+						var bidPrice3 = Math.floor(bidSecMap[secName]*Math.pow(10, (pips))%10);
+						bidPrice1 = "<span class='highpips'>" + bidPrice1 + "</span>";
+						bidPrice2 = "<span class='lowpips'>" + bidPrice2 + "</span>";
+						bidPrice3 = "<span class='restpips'>" + bidPrice3 + "</span>";
+						priceBid.innerHTML = bidPrice1 + bidPrice2 + bidPrice3;
+						var liqBid = document.getElementById("liqBid_" + secName);
+						liqBid.innerHTML = bidSecLiqMap[secName].toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+						var priceAsk = document.getElementById("priceAsk_" + secName);
+						var askPrice1 = Math.floor(askSecMap[secName]*Math.pow(10, (pips-3)))/Math.pow(10, (pips-3));
+						if (pips==3){
+							askPrice1 = askPrice1 + ".";
+						}
+						if (pips>3){
+							askPrice1 = askPrice1.toFixed(pips-3);
+						}
+						var askPrice2 = Math.floor(askSecMap[secName]*Math.pow(10, (pips-1))%100);
+						if (askPrice2<10){
+							askPrice2 = "0" + askPrice2;
+						}
+						var askPrice3 = Math.floor(askSecMap[secName]*Math.pow(10, (pips))%10);
+						askPrice1 = "<span class='highpips'>" + askPrice1 + "</span>";
+						askPrice2 = "<span class='lowpips'>" + askPrice2 + "</span>";
+						askPrice3 = "<span class='restpips'>" + askPrice3 + "</span>";
+						priceAsk.innerHTML = askPrice1 + askPrice2 + askPrice3;
+						var liqAsk = document.getElementById("liqAsk_" + secName);
+						liqAsk.innerHTML = askSecLiqMap[secName].toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+						
+					}
+				}
+			}
+		});
+	}
+
+	function setOrder(secName, side){
+		var price;
+		var limitprice=null;
+		if (typeSel.value=="limit"){
+			var pips = secPips[secName];
+			var diff = limitpips/Math.pow(10, (pips-3));
+			var currentprice;
+			if (side=="sell"){
+				currentprice=bidSecMap[secName];
+				limitprice=currentprice+diff;
+			}
+			else{
+				currentprice=bidSecMap[secName];
+				limitprice=currentprice-diff;
+			}
+		}
+		wrapper.setOrder(secName, tiSel.value, parseInt(quantity.value), side, typeSel.value, valSel.value, limitprice, null, null, null, null, resSetOrder);
+		//wrapper.setOrder(sec, tiSell.value, parseInt(quantitySel.value), "sell", typeSell.value, validity, parseFloat(priceSell.value), null, null, null, null, resSetOrder);
+	}
+
+	function resSetOrder(entry){
+		if (entry.hasOwnProperty('setOrderResponse')) {
+			if (entry.setOrderResponse.hasOwnProperty('order')) {
+				entry.setOrderResponse.order.forEach(function(order) {
+					var res = order.result;
+					var tempid = order.tempid;
+					alert("SET ORDER\n\nResult: " + res + "\nTempId: " + tempid);
+				});
+			}
+		}
+	}
+</script>
+</body>
+</html>

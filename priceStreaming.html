@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Javascript wrapper sample</title>
+    <link rel="stylesheet" href="style.css">
+    <meta charset="utf-8">
+</head>
+<body>
+
+<h1 id="security">Security</h1>
+<table width="100%">
+	<tr>
+		<td width="50%">
+			<table id="streamingTable" width="100%" border=1>
+				<caption style="font-size: 25px;"><b>Streaming Prices</b></caption>
+				<tr>
+					<th width="25%">Pair</th>
+					<th width="25%">Ask</th>
+					<th width="25%">Bid</th>
+					<th width="25%">Spread</th>
+				</tr>
+			</table>
+		</td>
+		<td width="50%">
+			<table id="pollingTable" width="100%" border=1>
+				<caption style="font-size: 25px;"><b>Polling Prices</b> <button type="submit" onclick="javascript: reloadPricePolling()">Reload Prices</button></caption>
+				<tr>
+					<th width="25%">Pair</th>
+					<th width="25%">Ask</th>
+					<th width="25%">Bid</th>
+					<th width="25%">Spread</th>
+				</tr>
+			</table>
+		</td>
+	</tr>
+</table>
+
+<script type="text/javascript" src="jquery.min.js"></script>
+<script type="text/javascript" src="jquery-ajaxreadystate.js"></script>
+<script type="text/javascript" src="2.0.0-crypto-sha1.js"></script>
+<script type="text/javascript" src="q.js"></script>
+<script type="text/javascript" src="wrapper.js"></script>
+<script type="text/javascript">
+
+var params = ["AUD/USD;5","EUR/AUD;5","EUR/CAD;5","EUR/CHF;5","EUR/GBP;5","EUR/JPY;3","EUR/USD;5","GBP/JPY;3","GBP/USD;5","USD/CAD;5","USD/JPY;3"]
+var secList = [];
+var secPips = {};
+var secBidPrices = {};
+var secAskPrices = {};
+var bidchange;
+var askchange;
+var secs = ["EUR/USD","GBP/USD","USD/JPY"];
+
+
+var wrapper = Object.create(Wrapper);
+wrapper.url = "http://actfx.adhara.io:81";
+wrapper.user = "adhara";
+wrapper.password = "adhara";
+
+function init(){
+	for (var i=0; i<params.length; i++){
+		var param = params[i];
+		var secName = param.split(";")[0];
+		var pips = param.split(";")[1];
+		secPips[secName]=pips;
+	}
+	for (var i=0; i<secs.length; i++){
+		var sec = secs[i];
+		addSec(sec);
+		var streamingTable = document.getElementById("streamingTable");
+		var row = streamingTable.insertRow(streamingTable.rows.length);
+		var cell0 = row.insertCell(0);
+		cell0.innerHTML = sec;
+		var cell1 = row.insertCell(1);
+		cell1.setAttribute("id", "streamingAsk_" + sec);
+		var cell2 = row.insertCell(2);
+		cell2.setAttribute("id", "streamingBid_" + sec);
+		var cell3 = row.insertCell(3);
+		cell3.setAttribute("id", "streamingSpr_" + sec);
+		var pollingTable = document.getElementById("pollingTable");
+		var row = pollingTable.insertRow(pollingTable.rows.length);
+		var cell4 = row.insertCell(0);
+		cell4.innerHTML = sec;
+		var cell5 = row.insertCell(1);
+		cell5.setAttribute("id", "pollingAsk_" + sec);
+		var cell6 = row.insertCell(2);
+		cell6.setAttribute("id", "pollingBid_" + sec);
+		var cell7 = row.insertCell(3);
+		cell7.setAttribute("id", "pollingSpr_" + sec);
+	}
+}
+
+function addSec(secName){
+	secList.push(secName);
+}
+
+function reloadPricePolling(){
+	wrapper.getPricePolling(secList, null, "tob", 1, updatePricePolling);
+}
+
+function updatePricePolling(entry){
+	var ask;
+	var bid;
+	if (entry.hasOwnProperty('getPriceResponse')) {
+		if (entry.getPriceResponse.hasOwnProperty('tick')) {
+			entry.getPriceResponse.tick.forEach(function(tick) {
+				var sec = tick.security;
+				var pips = secPips[sec];
+				if (tick.side=="ask") {
+					var ask = document.getElementById("pollingAsk_" + sec);
+					ask.innerHTML = tick.price.toFixed(pips);
+				}
+				if (tick.side=="bid") {
+					var bid = document.getElementById("pollingBid_" + sec);
+					bid.innerHTML = tick.price.toFixed(pips);
+				}
+			});
+			for (var i=0; i<secList.length; i++){
+				var sec = secList[i];
+				var pips = secPips[sec];
+				var spr = document.getElementById("pollingSpr_" + sec);
+				var ask = document.getElementById("pollingAsk_" + sec);
+				var bid = document.getElementById("pollingBid_" + sec);
+				spr.innerHTML = (ask.innerHTML - bid.innerHTML)*Math.pow(10, pips-1);
+			}
+		}
+	}
+}
+
+function getPriceStreaming(){
+	wrapper.getPriceStreaming( secList, null, "tob", 1, 1000, function processPrices(entry) {
+			var bidSecMap = {};
+			var askSecMap = {};
+			if (entry.hasOwnProperty('getPriceResponse')) {
+				if (entry.getPriceResponse.hasOwnProperty('tick')) {
+					entry.getPriceResponse.tick.forEach(function(tick) {
+						var secName = tick.security;
+						if (tick.side=="bid") {
+							if (!bidSecMap.hasOwnProperty(tick.security)){
+								bidSecMap[tick.security]=tick.price;
+							}
+							else{
+								if(tick.price>bidSecMap[tick.security]){
+									bidSecMap[tick.security]=tick.price;
+								}
+							}
+						}
+						if (tick.side=="ask") {
+							if (!askSecMap.hasOwnProperty(tick.security)){
+								askSecMap[tick.security]=tick.price;
+							}
+							else{
+								if(tick.price<askSecMap[tick.security]){
+									askSecMap[tick.security]=tick.price;
+								}
+							}
+						}
+					});
+				}
+			}
+			for (var i=0; i<secList.length; i++){
+				var secName = secList[i];
+				if (bidSecMap.hasOwnProperty(secName)){
+					var pips = secPips[secName];
+					var d=(1/(Math.pow(10, pips)));
+					var delta = document.getElementById("streamingSpr_" + secName);
+					if (delta!=null){
+						delta.innerHTML = "&#916;" + ((askSecMap[secName] - bidSecMap[secName])*Math.pow(10, (pips-1))).toFixed(1);
+						var priceBid = document.getElementById("streamingBid_" + secName);
+						var bidPriceInt = Math.round(bidSecMap[secName]*Math.pow(10, (pips)));
+						var bidPrice3 = bidPriceInt%10;
+						var bidPrice2 = Math.round((bidPriceInt - bidPrice3)/10)%100;
+						if (bidPrice2<10){
+							bidPrice2 = "0" + bidPrice2;
+						}
+						var bidPrice1 = Math.round((bidPriceInt - (bidPrice2*10 + bidPrice3))/1000);
+						bidPrice1 = (bidPrice1/Math.pow(10, (pips-3))).toFixed(pips-3);
+						if (pips==3){
+							bidPrice1 = bidPrice1 + ".";
+						}
+						bidchange = 'price_middle';
+						if(bidSecMap[secName]>secBidPrices[secName]){
+							bidchange = 'price_up';
+						}
+						if(bidSecMap[secName]<secBidPrices[secName]){
+							bidchange = 'price_down';
+						}
+						bidPrice1 = "<span class='highpips " + bidchange + "'>" + bidPrice1 + "</span>";
+						bidPrice2 = "<span class='lowpips " + bidchange + "'>" + bidPrice2 + "</span>";
+						bidPrice3 = "<span class='restpips " + bidchange + "'>" + bidPrice3 + "</span>";
+						priceBid.innerHTML = bidPrice1 + bidPrice2 + bidPrice3;
+						var priceAsk = document.getElementById("streamingAsk_" + secName);
+						var askPriceInt = Math.round(askSecMap[secName]*Math.pow(10, (pips)));
+						var askPrice3 = askPriceInt%10;
+						var askPrice2 = Math.round((askPriceInt - askPrice3)/10)%100;
+						if (askPrice2<10){
+							askPrice2 = "0" + askPrice2;
+						}
+						var askPrice1 = Math.round((askPriceInt - (askPrice2*10 + askPrice3))/1000);
+						askPrice1 = (askPrice1/Math.pow(10, (pips-3))).toFixed(pips-3);
+						if (pips==3){
+							askPrice1 = askPrice1 + ".";
+						}
+						askchange = 'price_middle';
+						if(askSecMap[secName]>secAskPrices[secName]){
+							askchange = 'price_up';
+						}
+						if(askSecMap[secName]<secAskPrices[secName]){
+							askchange = 'price_down';
+						}
+						askPrice1 = "<span class='highpips " + askchange + "'>" + askPrice1 + "</span>";
+						askPrice2 = "<span class='lowpips " + askchange + "'>" + askPrice2 + "</span>";
+						askPrice3 = "<span class='restpips " + askchange + "'>" + askPrice3 + "</span>";
+						priceAsk.innerHTML = askPrice1 + askPrice2 + askPrice3;
+					}
+				}
+			}
+			secBidPrices=bidSecMap;
+			secAskPrices=askSecMap;
+		}
+	);
+}
+
+init();
+wrapper.getAuthentication()
+.then(function(resp){
+	getPriceStreaming();
+	reloadPricePolling();
+});
+
+</script>
+
+</body>
+</html>

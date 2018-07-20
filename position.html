@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Equity</title>
+	<link rel="stylesheet" href="style2.css">
+	<meta charset="utf-8">
+</head>
+<body>
+
+
+<ul class="tab" style="width:600px;">
+  <li><a href="#" class="tabposition" onclick="openTabPosition(event, 'Position')">Open position</a></li>
+  <li><a href="#" class="tabposition" onclick="openTabPosition(event, 'Cash')">Cash</a></li>
+  <li><a href="#" class="tabposition" onclick="openTabPosition(event, 'Risk')">Total risk</a></li>
+</ul>
+
+<div id="Position" class="tabcontent" style="width:600px;">
+	<div id="accSecSelDiv">
+		Select PB account(s): &#160;&#160;
+		<select id="accSecSel" onchange="changeSecPos()" style="width:140px">
+			<option value="ALL">ALL</option>
+		</select>
+	</div>
+			<table width="100%" class="scroll">
+				<thead>
+					<tr>
+						<th width="24%">Security</th>
+						<th width="24%">Position</th>
+						<th width="24%">Side</th>
+						<th width="24%">P&L</th>
+					</tr>
+				</thead>
+				<tbody id="streamingSecurityPositionTable" style="height:200px;">
+				</tbody>
+			</table>
+</div>
+
+<div id="Cash" class="tabcontent" style="width:600px;">
+	<div id="accCashSelDiv">
+		Select PB account(s): &#160;&#160;
+		<select id="accCashSel" onchange="changeCashPos()" style="width:140px">
+			<option value="ALL">ALL</option>
+		</select>
+	</div>
+			<table width="100%" class="scroll">
+				<thead>
+					<tr>
+						<th width="48%">Currency</th>
+						<th width="48%">Position</th>
+					</tr>
+				</thead>
+				<tbody id="streamingCashPositionTable" style="height:200px;">
+				</tbody>
+			</table>
+</div>
+
+<div id="Risk" class="tabcontent" style="width:600px;">
+	<div id="accRiskSelDiv">
+		Select PB account(s): &#160;&#160;
+		<select id="accRiskSel" onchange="changeRiskPos()" style="width:140px">
+			<option value="ALL">ALL</option>
+		</select>
+	</div>
+			<table width="100%" class="scroll">
+				<thead>
+					<tr>
+						<th width="48%">Currency</th>
+						<th width="48%">Position</th>
+					</tr>
+				</thead>
+				<tbody id="streamingRiskPositionTable" style="height:200px;">
+				</tbody>
+			</table>
+</div>
+
+
+<script type="text/javascript" src="jquery.min.js"></script>
+<script type="text/javascript" src="jquery-ajaxreadystate.js"></script>
+<script type="text/javascript" src="2.0.0-crypto-sha1.js"></script>
+<script type="text/javascript" src="q.js"></script>
+<script type="text/javascript" src="wrapper.js"></script>
+<script src="https://code.highcharts.com/stock/highstock.js"></script>
+<script src="https://code.highcharts.com/stock/modules/exporting.js"></script>
+<script type="text/javascript">
+
+function openTabPosition(evt, tabSel) {
+    var i, tabcontents, tabpositions;
+    tabcontents = document.getElementsByClassName("tabcontent");
+    for (i = 0; i < tabcontents.length; i++) {
+        tabcontents[i].style.display = "none";
+    }
+    tabpositions = document.getElementsByClassName("tabposition");
+    for (i = 0; i < tabcontents.length; i++) {
+        tabpositions[i].className = tabpositions[i].className.replace(" active", "");
+    }
+    document.getElementById(tabSel).style.display = "block";
+    evt.currentTarget.className += " active";
+}
+
+var wrapper = Object.create(Wrapper);
+wrapper.url = "http://actfx.adhara.io:81";
+wrapper.user = "adhara";
+wrapper.password = "adhara";
+
+var accSecSelected=accSecSel.value;
+var accCashSelected=accCashSel.value;
+var accRiskSelected=accRiskSel.value;
+
+function getAccount(){
+	wrapper.getAccount(updateAccounts);
+}
+
+function updateAccounts(entry){
+	if (entry.hasOwnProperty('getAccountResponse')) {
+		if (entry.getAccountResponse.hasOwnProperty('account')) {
+			var accSecSel = document.getElementById("accSecSel");
+			entry.getAccountResponse.account.forEach(function(acc) {
+				var accSecOption = new Option(acc.name, acc.name);
+				var accCashOption = new Option(acc.name, acc.name);
+				var accRiskOption = new Option(acc.name, acc.name);
+				accSecSel.add(accSecOption);
+				accCashSel.add(accCashOption);
+				accRiskSel.add(accRiskOption);
+			});
+		}
+	}
+}
+
+var secPos=[];
+var assetPos=[];
+function getPositionStreaming(){
+	wrapper.getPositionStreaming( null, null, null, 1000, function processPosition(entry) {
+			if (entry.hasOwnProperty('getPositionResponse')) {
+				if (entry.getPositionResponse.hasOwnProperty('securityposition')) {
+					var changed = false;
+					entry.getPositionResponse.securityposition.forEach(function(securityposition) {
+						if (securityposition.account=="<AGGREGATED>"){
+							securityposition.account = "ALL";
+						}
+console.log(securityposition.account + "-" + accSecSelected);
+						if(securityposition.account==accSecSelected){
+							changed = true;
+						}
+						var newrow = true;
+						for (var i=0; i<secPos.length; i++){
+//console.log(secPos[i][0] + "-" + securityposition.account + "-" + secPos[i][1] + "-" + securityposition.security);
+							if (secPos[i][0] == securityposition.account && secPos[i][1] == securityposition.security){
+								newrow = false;
+								secPos[i][2] = securityposition.exposure;
+								secPos[i][3] = securityposition.price;
+								secPos[i][4] = securityposition.side;
+								secPos[i][5] = securityposition.pl;
+								break;
+							}
+						}
+						if (newrow==true){
+							secPos.push([
+								securityposition.account,
+								securityposition.security,
+								securityposition.exposure,
+								securityposition.price,
+								securityposition.side,
+								securityposition.pl
+							]);
+						}
+					});
+					if (changed==true){
+						showSecPos();
+					}
+				}
+
+
+				if (entry.getPositionResponse.hasOwnProperty('assetposition')) {
+					var changed = false;
+					entry.getPositionResponse.assetposition.forEach(function(assetposition) {
+						if (assetposition.account=="<AGGREGATED>"){
+							assetposition.account = "ALL";
+						}
+						if(assetposition.account==accCashSelected){
+							changed = true;
+						}
+						var newrow = true;
+						for (var i=0; i<assetPos.length; i++){
+							if (assetPos[i][0] == assetposition.account && assetPos[i][1] == assetposition.asset){
+								newrow = false;
+								assetPos[i][2] = assetposition.exposure;
+								assetPos[i][3] = assetposition.totalrisk;
+								assetPos[i][4] = assetposition.pl;
+								break;
+							}
+						}
+						if (newrow==true){
+							assetPos.push([
+								assetposition.account,
+								assetposition.asset,
+								assetposition.exposure,
+								assetposition.totalrisk,
+								assetposition.pl
+							]);
+						}
+					});
+					if (changed==true){
+						showCashPos();
+						showRiskPos();
+					}
+				}
+
+			}
+		}
+	);
+}
+
+
+function changeSecPos(){
+	accSecSelected=accSecSel.value;
+console.log("SELECTED-" + accSecSelected);
+	showSecPos();
+}
+
+function showSecPos(){
+	var streamingSecurityPositionTable = document.getElementById("streamingSecurityPositionTable");
+var num = streamingSecurityPositionTable.rows.length;
+	for (var i=0; i<num; i++){
+		streamingSecurityPositionTable.deleteRow(0);
+	}
+	for (var i=0; i<secPos.length; i++){
+		if (secPos[i][0]==accSecSelected){
+			var row = streamingSecurityPositionTable.insertRow(streamingSecurityPositionTable.rows.length);
+			var cellSec = row.insertCell(-1);
+			cellSec.innerHTML = secPos[i][1];
+			var cellExp = row.insertCell(-1);
+			cellExp.innerHTML = secPos[i][2] + '@' + secPos[i][3];
+			var cellSid = row.insertCell(-1);
+			cellSid.innerHTML = secPos[i][4];
+			var cellPl = row.insertCell(-1);
+			cellPl.innerHTML = secPos[i][5];
+			cellSec.style.width="24%";
+			cellExp.style.width="24%";
+			cellSid.style.width="24%";
+			cellPl.style.width="24%";
+		}
+	}
+}
+
+function changeCashPos(){
+	accCashSelected=accCashSel.value;
+console.log("SELECTED-" + accCashSelected);
+	showCashPos();
+}
+
+function showCashPos(){
+	var streamingCashPositionTable = document.getElementById("streamingCashPositionTable");
+var num = streamingCashPositionTable.rows.length;
+	for (var i=0; i<num; i++){
+		streamingCashPositionTable.deleteRow(0);
+	}
+	for (var i=0; i<assetPos.length; i++){
+		if (assetPos[i][0]==accCashSelected){
+			var row = streamingCashPositionTable.insertRow(streamingCashPositionTable.rows.length);
+			var cellCur = row.insertCell(-1);
+			cellCur.innerHTML = assetPos[i][1];
+			var cellPos = row.insertCell(-1);
+			cellPos.innerHTML = assetPos[i][2];
+			cellCur.style.width="48%";
+			cellPos.style.width="48%";
+		}
+	}
+}
+
+function changeRiskPos(){
+	accRiskSelected=accRiskSel.value;
+console.log("SELECTED-" + accRiskSelected);
+	showRiskPos();
+}
+
+function showRiskPos(){
+	var streamingRiskPositionTable = document.getElementById("streamingRiskPositionTable");
+var num = streamingRiskPositionTable.rows.length;
+	for (var i=0; i<num; i++){
+		streamingRiskPositionTable.deleteRow(0);
+	}
+	for (var i=0; i<assetPos.length; i++){
+		if (assetPos[i][0]==accRiskSelected){
+			var row = streamingRiskPositionTable.insertRow(streamingRiskPositionTable.rows.length);
+			var cellCur = row.insertCell(-1);
+			cellCur.innerHTML = assetPos[i][1];
+			var cellPos = row.insertCell(-1);
+			cellPos.innerHTML = assetPos[i][3];
+			cellCur.style.width="48%";
+			cellPos.style.width="48%";
+		}
+	}
+}
+
+
+wrapper.getAuthentication()
+.then(function(resp){
+	getAccount();
+	getPositionStreaming();
+});
+
+
+
+</script>
+
+</body>
+</html>
