@@ -257,7 +257,7 @@ if(xhr.readyState == 3) {   // state 4: that data has been received
 
 function streaming(url, data, callback) {
 	var lastPtr = 0;
-	jQuery.support.cors = true;
+	//jQuery.support.cors = true;
 	$.ajaxreadystate({
 		type: "POST",
 		contentType: "application/json",
@@ -283,15 +283,14 @@ withCredentials : true,
 				var resp = jqXHR.responseText.substring(lastPtr);
 				lastPtr  = jqXHR.responseText.length;
 console.log(jqXHR.responseText);
-				if (resp.indexOf("heartbeat")>-3){
-
+				if (resp.indexOf("heartbeat")<0 || ((resp.match(/\n/g) || []).length)>1){
 console.log(resp);
 					var jsonArray2 = '[' + resp.replace (/\n?\n/g, ",") + ']';
-console.log(jsonArray2);
+//console.log(jsonArray2);
 					var jsonArray = jsonArray2.replace (/,]/g, "]");
-console.log(jsonArray);
+//console.log(jsonArray);
 					var response = JSON.parse (jsonArray);
-console.log(response);
+//console.log(response);
 					response.forEach (function(entry) {
 						try{
 							callback(entry);
@@ -303,19 +302,20 @@ console.log(response);
 							}
 						}
 					});
+/*
 console.log(url + "-" + lastPtr);
 if (lastPtr>5000){
 	jqXHR.responseText="{}";
 	lastPtr = 0;
 }
-/*
+*/
 					if (lastPtr>100000){
 						jqXHR.abort();
 						var newdata = data.replace(/"number":\d+/g, '"number":2')
 						console.log(newdata);
 						streaming(url, newdata, callback);
 					}
-*/
+
 				}
 			}
 		},
